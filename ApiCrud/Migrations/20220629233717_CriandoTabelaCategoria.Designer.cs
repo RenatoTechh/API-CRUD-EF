@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace ApiCrud.Migrations
 {
-    [DbContext(typeof(CategoriaContext))]
+    [DbContext(typeof(Data.AppDbContext))]
     [Migration("20220629233717_CriandoTabelaCategoria")]
     partial class CriandoTabelaCategoria
     {

@@ -1,5 +1,7 @@
 ﻿using ApiCrud.Data;
+using ApiCrud.Data.DTOs;
 using ApiCrud.Models;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
@@ -11,15 +13,19 @@ namespace ApiCrud.Controllers
     [Route("[Controller]")]
     public class CategoriaController : Controller
     {
-        private CategoriaContext _context;
+        private AppDbContext _context;
+        private IMapper _mapper;
 
-        public CategoriaController(CategoriaContext context)
+        public CategoriaController(AppDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
         [HttpPost]
-        public IActionResult AdicionaCategoria([FromBody] Categoria categoria)
+        public IActionResult AdicionaCategoria([FromBody] CreateCategoriaDto categoriaDto)
         {
+            var categoria = _mapper.Map<Categoria>(categoriaDto);
+
             categoria.Status = true;
             categoria.DataCriacao = DateTime.Now;
             
@@ -32,27 +38,61 @@ namespace ApiCrud.Controllers
         [HttpGet]
         public IActionResult ConsultaCategorias()
         {
- 
-            return Ok(_context.Categorias.OrderBy(categoria => categoria.Nome));
+            var categoria = _context.Categorias.OrderBy(categoria => categoria.Nome);
+            var categoriaDto = _mapper.Map<List<ReadCategoriaDto>>(categoria);
+
+            return Ok(categoriaDto);
         }
-        [HttpGet("{nome}")]
-        public IActionResult ConsultaCategoriaPorNome(string nome)
+        [HttpGet("{nome}/{skip:int}/{take:int}")]
+        public IActionResult ConsultaCategoriaPorNome(string nome, int skip, int take)
         {
-            var categoria = _context.Categorias.FirstOrDefault(categoria => categoria.Nome.ToLower() == nome.ToLower());
+            var categoria = _context.Categorias.Skip(skip).Take(take)
+                .Where(categoria => categoria.Nome.ToLower() == nome.ToLower()).ToList();
             if (categoria != null)
             {
-                return Ok(categoria);
+                var categoriaDto = _mapper.Map<List<ReadCategoriaDto>>(categoria);
+                return Ok(categoriaDto);
             }           
             return NotFound();
         }
-        [HttpPut("{nome}")]
-        public IActionResult AtualizaCategoria(string nome, [FromBody] Categoria novaCategoria)
+
+        [HttpPut("{CategoriaId:int}")]
+        public IActionResult AtualizaCategoria(int CategoriaId, [FromBody] UpdateCategoriaDto categoriaDto)
         {
-            var categoria = _context.Categorias.FirstOrDefault(categoria => categoria.Nome.ToLower() == nome.ToLower());
+            var categoria = _context.Categorias.FirstOrDefault(categoria => categoria.CategoriaId == CategoriaId);
+
             if (categoria != null)
             {
-                categoria.Nome = novaCategoria.Nome;
-                categoria.DataModificacao = novaCategoria.DataModificacao;
+                if (categoriaDto.Status == true)
+                {
+                    categoriaDto.DataModificacao = DateTime.Now;
+                    _mapper.Map(categoriaDto, categoria);
+                }
+                else
+                {
+                    categoriaDto.DataModificacao = DateTime.Now;
+                    _mapper.Map(categoriaDto, categoria);
+
+                    var Subcategorias = _context.Subcategorias.Where(subcategoria => subcategoria.CategoriaID == CategoriaId).ToList();
+
+                    foreach (var subcategoria in Subcategorias)
+                    {
+                        subcategoria.Status = false;
+                        subcategoria.DataModificacao = DateTime.Now;
+                    }
+                    _context.SaveChanges();
+                }
+                return NoContent();
+            }
+            return NotFound();
+        }
+        [HttpDelete("{CategoriaId}")]
+        public IActionResult ExcluiCategoria(int categoriaId)
+        {
+            var categoria = _context.Categorias.FirstOrDefault(categoria => categoria.CategoriaId == categoriaId);
+            if (categoria != null)
+            {
+                _context.Categorias.Remove(categoria);
                 _context.SaveChanges();
 
                 return NoContent();
