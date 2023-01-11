@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
@@ -14,12 +15,14 @@ namespace ApiCrud.Models
         [RegularExpression("^[a-zA-Z ]+$")]
         public string Nome { get; set; }
         [Required(ErrorMessage = "Campo status é obrigatório")]
-        public bool Status { get; set; }
-        //[Required(ErrorMessage = "Campo DataCriacao é obrigatório")]
+        public bool? Status { get; set; } = null;
+        [Required(ErrorMessage = "Campo DataCriacao é obrigatório")]
         public DateTime DataCriacao { get; set; }
         public DateTime? DataModificacao { get; set; }
         [Required]
         public int CategoriaID { get; set; }
         public virtual Categoria Categoria { get; set; }
+        [JsonIgnore]
+        public virtual List<Produto> Produtos { get; set; }
     }
 }

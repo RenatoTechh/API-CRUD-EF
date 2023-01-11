@@ -12,9 +12,8 @@ namespace ApiCrud.Data.DTOs
         public bool Status { get; set; }
         public string DataCriacao { get; set; }
         public DateTime DataModificacao { get; set; }
-        //[JsonIgnore]
-        //public int CategoriaId { get; set; }
         public Categoria Categoria { get; set; }
+        public object Produtos { get; set; }
 
     }
 }

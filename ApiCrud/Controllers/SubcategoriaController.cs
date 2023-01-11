@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using ApiCrud.Data.DAO;
 
 namespace ApiCrud.Controllers
 {
@@ -14,23 +15,19 @@ namespace ApiCrud.Controllers
     [Route("[Controller]")]
     public class SubcategoriaController : Controller
     {
-        private AppDbContext _context;
         private IMapper _mapper;
+        private SubcategoriaDao _dao;
 
-        public SubcategoriaController(AppDbContext context, IMapper mapper)
+        public SubcategoriaController( IMapper mapper, SubcategoriaDao dao)
         {
-            _context = context;
             _mapper = mapper;
+            _dao = dao;
         }
         [HttpPost]
         public IActionResult AdicionaSubcategoria([FromBody] CreateSubcategoriaDto subcategoriaDto)
         {
-            if (true)
-            {
+            Categoria categoria = _dao.BuscaCategoriaIdSubcategoria(subcategoriaDto);
 
-            }   
-            // Verifica o Id da Categoria com a chave estrangeira da subcategoria
-            var categoria = _context.Categorias.FirstOrDefault(categoria => categoria.CategoriaId == subcategoriaDto.CategoriaID);
             // Verifica se a consulta da categoria retornouu algum objeto
             if (categoria == null)
             {
@@ -38,31 +35,19 @@ namespace ApiCrud.Controllers
             }
             // Cadastra a subcategoria somente se a categoria estiver ativa
             if (categoria.Status == true)
-            {
-                subcategoriaDto.DataCriacao = DateTime.Now;
-                Subcategoria subcategoria = _mapper.Map<Subcategoria>(subcategoriaDto);
-                _context.Subcategorias.Add(subcategoria);
-                _context.SaveChanges();
-                // Onde encontrar o recurso que foi criado
+            {   
+                var subcategoria = _mapper.Map<Subcategoria>(subcategoriaDto);
+                subcategoria.DataCriacao = DateTime.Now;
+                subcategoria.Status = true;
+                _dao.AddSubcategoria(subcategoria);
+                // Onde encontrar o objeto que foi criado
                 return CreatedAtAction(nameof(ConsultaSubcategoriaPorNome), new { nome = subcategoria.Nome }, subcategoria);
             }
 
             return BadRequest("A categoria está inativa");
-
-            
+   
         }
-        [HttpGet("{skip:int}/{take:int}")]
-        public IActionResult ConsultaSubcategorias(int skip, int take)
-        {
-            if (take > 3)
-            {
-                return BadRequest("Limite atingido");
-            }
-            var subcategorias = _context.Subcategorias.Skip(skip).Take(take).ToList();
-
-            return Ok(subcategorias.OrderBy(subcategoria => subcategoria.Nome));
-
-        }
+        
         [HttpGet("{nome}")]
         public IActionResult ConsultaSubcategoriaPorNome(string nome)
         {
@@ -72,9 +57,7 @@ namespace ApiCrud.Controllers
                 return BadRequest("Digite um nome entre 3 e 128 caracteres, somente alfabeto!");
             }
 
-            // Realiza a busca no banco através do nome
-            var subcategoria = _context.Subcategorias
-                .Where(subcategoria => subcategoria.Nome.ToLower() == nome.ToLower()).ToList();
+            var subcategoria = _dao.BuscaSubcategoriaPorNome(nome);
             // Verifica se foi encontrada alguma subcaegoria
             if (subcategoria == null)
             {
@@ -84,35 +67,64 @@ namespace ApiCrud.Controllers
             var subcategoriaDto = _mapper.Map<List<ReadSubcategoriaDto>>(subcategoria);
             return Ok(subcategoriaDto);
         }
-        [HttpGet("{status:bool}/{skip:int}/{take:int}")]
-        public IActionResult ConsultaSubcategoriaPorStatus(bool status, int skip, int take)
+        [HttpGet("{skip:int}/{take:int}")]
+        public IActionResult ConsultaSubcategoriaPorStatus([FromQuery] bool? status, [FromQuery] string nome, int skip, int take)
         {
+
             if (take > 3)
             {
                 return BadRequest("Limite atingido");
             }
-            // Realiza a busca no banco através do status
-            var subcategoria = _context.Subcategorias.Skip(skip).Take(take)
-                .Where(subcategoria => subcategoria.Status == status).ToList();
-            // Verifica se foi encontrada alguma subcaegoria
-            if (subcategoria == null)
+
+            var subcategorias = _dao.RetornaTodasSubcategorias();
+
+            if (status == true)
             {
-                return NotFound();
+                if (status == true && String.IsNullOrEmpty(nome))
+                {
+                    return Ok(_dao.RetornaSubcategoriasStatus(skip, take, status));
+                }
+                var listaSubcategoriasTrue = _dao.RetornaSubcategoriasStatusENome(skip, take, nome, status);
+
+                if (listaSubcategoriasTrue.Count == 0)
+                {
+                    return NotFound();
+                }
+                subcategorias = listaSubcategoriasTrue;
+
+                var subcategoriaDto = _mapper.Map<List<ReadSubcategoriaDto>>(subcategorias);
+                return Ok(subcategoriaDto);
             }
-            // 
-            var subcategoriaDto = _mapper.Map<List<ReadSubcategoriaDto>>(subcategoria);
-            return Ok(subcategoriaDto);
+            
+            if (status == false)
+            {
+                if (String.IsNullOrEmpty(nome))
+                {
+                    return Ok(_dao.RetornaSubcategoriasStatus(skip, take, status));
+                }
+
+                var listaSubcategoriasFalse = _dao.RetornaSubcategoriasStatusENome(skip, take, nome, status);
+
+                if (listaSubcategoriasFalse.Count == 0)
+                {
+                    return NotFound();
+                }
+
+                subcategorias = listaSubcategoriasFalse;
+
+                var subcategoriaDto = _mapper.Map<List<ReadSubcategoriaDto>>(subcategorias);
+                return Ok(subcategoriaDto);
+            }
+            return Ok(subcategorias);
         }
         [HttpPut("{id:int}")]
         public IActionResult AtualizaSubcategoria(int id, [FromBody] UpdateSubcategoriaDto subcategoriaDto)
         {
-            var subcategoria = _context.Subcategorias
-                .FirstOrDefault(subcategoria => subcategoria.Id == id);
+            var subcategoria = _dao.RetornaSubcategoriaPorId(id);
+
             if (subcategoria != null)
             {
-                subcategoriaDto.DataModificacao = DateTime.Now;//subcategoria
-                _mapper.Map(subcategoriaDto,subcategoria);
-                _context.SaveChanges();
+                _dao.AlteraStatus(subcategoriaDto, subcategoria);
 
                 return NoContent();
             }
@@ -121,11 +133,10 @@ namespace ApiCrud.Controllers
         [HttpDelete("{Id:int}")]
         public IActionResult ExcluiSubcategoria(int Id)
         {
-            var subcategoria = _context.Subcategorias.FirstOrDefault(subcategoria => subcategoria.Id == Id);
+            var subcategoria = _dao.RetornaSubcategoriaPorId(Id);
             if (subcategoria != null)
             {
-                _context.Subcategorias.Remove(subcategoria);
-                _context.SaveChanges();
+                _dao.RemoveSubcategoria(subcategoria);
 
                 return NoContent();
             }

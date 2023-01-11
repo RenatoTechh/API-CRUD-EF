@@ -11,10 +11,7 @@ namespace ApiCrud.Profiles
         {
             CreateMap<CreateCategoriaDto, Categoria>();
             CreateMap<UpdateCategoriaDto, Categoria>();
-            CreateMap<Categoria, ReadCategoriaDto>()
-                .ForMember(categoria => categoria.Subcategorias, opts => opts
-                .MapFrom(categoria => categoria.Subcategorias.Select
-                (s => new { s.Id, s.Nome, s.DataCriacao, s.DataModificacao})));
+            CreateMap<Categoria, ReadCategoriaDto>();
         }
     }
 }
